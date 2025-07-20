@@ -1,10 +1,10 @@
-import re
+from http import HTTPStatus
 
 from flask import jsonify, request
 
 from . import app, db
 from .error_handlers import InvalidAPIUsage
-from .models import get_unique_short_id, URLMap
+from .models import get_unique_short_id, URLMap, validate_short_id_syntax
 
 
 @app.route('/api/id/<string:short_id>/', methods=['GET'])
@@ -12,26 +12,28 @@ from .models import get_unique_short_id, URLMap
 def get_original(short_id):
     urlmap = URLMap.query.filter_by(short=short_id).first()
     if urlmap is None:
-        raise InvalidAPIUsage('Указанный id не найден', 404)
-    return jsonify({'url': urlmap.original}), 200
+        raise InvalidAPIUsage('Указанный id не найден', HTTPStatus.NOT_FOUND)
+    return jsonify({'url': urlmap.original}), HTTPStatus.OK
 
 
 @app.route('/api/id/', methods=['POST'])
 def add_urlmap():
     data = request.get_json(silent=True)
 
-    if not data:
-        raise InvalidAPIUsage('Отсутствует тело запроса', 400)
+    if data is None:
+        raise InvalidAPIUsage(
+            'Отсутствует тело запроса', HTTPStatus.BAD_REQUEST)
     if 'url' not in data:
-        raise InvalidAPIUsage('"url" является обязательным полем!', 400)
+        raise InvalidAPIUsage(
+            '"url" является обязательным полем!', HTTPStatus.BAD_REQUEST)
     if (
             'custom_id' in data
             and data['custom_id'] != ''
-            and re.match(r'^[a-zA-Z0-9]{1,16}$', data['custom_id']) is None
+            and not validate_short_id_syntax(data['custom_id'])
     ):
         raise InvalidAPIUsage(
             'Указано недопустимое имя для короткой ссылки',
-            400
+            HTTPStatus.BAD_REQUEST
         )
     if (
             'custom_id' in data
@@ -41,7 +43,7 @@ def add_urlmap():
     ):
         raise InvalidAPIUsage(
             'Предложенный вариант короткой ссылки уже существует.',
-            400
+            HTTPStatus.BAD_REQUEST
         )
 
     if 'custom_id' not in data or data['custom_id'] == '':

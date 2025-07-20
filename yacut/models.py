@@ -1,5 +1,6 @@
 from datetime import datetime
 import random
+import re
 import string
 
 import flask
@@ -20,6 +21,11 @@ def get_unique_short_id() -> str:
             short = None
             break
     return short
+
+
+def validate_short_id_syntax(short: str) -> bool:
+    return re.match(
+        r'^[a-zA-Z0-9]{1,16}$', short, re.IGNORECASE) is not None
 
 
 class URLMap(db.Model):
